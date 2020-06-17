@@ -21,7 +21,7 @@ data Config m a = Config {
     mutate :: a -> m a,
     cross :: a -> a -> m a,
     selectParent :: V.Vector (Double, a) -> m a,
-    withOldGen :: Int -> Double -> a -> V.Vector a -> m ()
+    withOldGen :: Int -> V.Vector (Double, a) -> m ()
 }
 
 gaussian :: MonadRandom m => Double -> m Double
@@ -53,14 +53,13 @@ calcFitnesses fitnessFunc pop =
 
 step :: Monad m => Int -> Config m a -> V.Vector (Double, a) -> m (V.Vector (Double, a))
 step genIdx config measuredPop =
-    let (bestFitness, bestMember) = measuredPop V.! 0
-        childGen = do
+    let childGen = do
             a0 <- selectParent config measuredPop
             a1 <- selectParent config measuredPop
             a <- cross config a0 a1
             mutate config a
     in do
-        withOldGen config genIdx bestFitness bestMember (fmap snd measuredPop)
+        withOldGen config genIdx measuredPop
         fitnessFunc <- fitness config
         newPop <- V.replicateM (numMembers config) childGen
         let measuredNewPop = calcFitnesses fitnessFunc newPop
