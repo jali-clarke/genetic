@@ -16,7 +16,6 @@ import qualified Data.Vector.Algorithms.Heap as V
 data Config m a = Config {
     numGens :: Int,
     numMembers :: Int,
-    numElites :: Int,
     newMember :: m a,
     fitness :: m (a -> Double),
     mutate :: a -> m a,
@@ -52,23 +51,22 @@ calcFitnesses fitnessFunc pop =
         vecStrat = fmap V.fromList . parListChunk (V.length pop `div` 16) evalFirstStrat . V.toList
     in withStrategy vecStrat toEval
 
-step :: Monad m => Int -> Config m a -> V.Vector a -> m (V.Vector a)
-step genIdx config pop =
-    let popSize = V.length pop
-        numToBreed = popSize - numElites config
+step :: Monad m => Int -> Config m a -> V.Vector (Double, a) -> m (V.Vector (Double, a))
+step genIdx config measuredPop =
+    let (bestFitness, bestMember) = measuredPop V.! 0
+        childGen = do
+            a0 <- selectParent config measuredPop
+            a1 <- selectParent config measuredPop
+            a <- cross config a0 a1
+            mutate config a
     in do
+        withOldGen config genIdx bestFitness bestMember (fmap snd measuredPop)
         fitnessFunc <- fitness config
-        let measuredPop = sortFitness (calcFitnesses fitnessFunc pop)
-            (bestFitness, bestMember) = measuredPop V.! 1
-            elites = fmap snd . V.take (numElites config) $ measuredPop
-            childGen = do
-                a0 <- selectParent config measuredPop
-                a1 <- selectParent config measuredPop
-                a <- cross config a0 a1
-                mutate config a
-        withOldGen config genIdx bestFitness bestMember pop
-        children <- V.replicateM numToBreed childGen
-        pure . V.force $ elites <> children
+        newPop <- V.replicateM (numMembers config) childGen
+        let measuredNewPop = calcFitnesses fitnessFunc newPop
+            allMeasured = measuredPop <> measuredNewPop
+            sortedPop = sortFitness allMeasured
+        pure . V.force $ V.take (numMembers config) sortedPop
 
 simulate :: Monad m => Config m a -> m ()
 simulate config =
@@ -76,4 +74,7 @@ simulate config =
             when (genIdx < numGens config) $ step genIdx config pop >>= stepHelper (genIdx + 1)
     in do
         startingPop <- V.replicateM (numMembers config) (newMember config)
-        stepHelper 0 startingPop
+        fitnessFunc <- fitness config
+        let measuredPop = calcFitnesses fitnessFunc startingPop
+            sortedPop = sortFitness measuredPop
+        stepHelper 0 sortedPop
