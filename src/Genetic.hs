@@ -70,7 +70,7 @@ step genIdx config measuredPop =
 simulate :: Monad m => Config m a -> m ()
 simulate config =
     let stepHelper genIdx pop =
-            when (genIdx < numGens config) $ step genIdx config pop >>= stepHelper (genIdx + 1)
+            when (genIdx <= numGens config) $ step genIdx config pop >>= stepHelper (genIdx + 1)
     in do
         startingPop <- V.replicateM (numMembers config) (newMember config)
         fitnessFunc <- fitness config
