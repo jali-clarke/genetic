@@ -1,10 +1,12 @@
 module Genetic.Strategies
   ( rouletteSelect,
     tournamentSelect,
+    uniformMutate,
   )
 where
 
 import Control.Monad.Random.Class (MonadRandom (getRandomR))
+import Control.Monad.Random.Lazy (Random)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 
@@ -27,6 +29,9 @@ tournamentSelect populationWithFitness = do
   (member0, fitness0) <- chooseVectorUniform populationWithFitness
   (member1, fitness1) <- chooseVectorUniform populationWithFitness
   pure $ if fitness0 > fitness1 then member0 else member1
+
+uniformMutate :: (Random a, Num a, MonadRandom m) => (a, a) -> a -> m a
+uniformMutate (deltaMin, deltaMax) base = (+ base) <$> getRandomR (deltaMin, deltaMax)
 
 chooseVectorUniform :: MonadRandom m => Vector a -> m a
 chooseVectorUniform items = Vector.unsafeIndex items <$> getRandomR (0, Vector.length items - 1)
