@@ -12,7 +12,13 @@
         default = final: prev: {
           haskellPackages = prev.haskellPackages.override { overrides = self.overlays.haskell; };
           haskell = prev.haskell // {
-            packages = builtins.mapAttrs (_: compilerPackages: compilerPackages.override { overrides = self.overlays.haskell; }) prev.haskell.packages;
+            packages =
+              let
+                addPackages = _: compilerPackages: compilerPackages.override {
+                  overrides = self.overlays.haskell;
+                };
+              in
+              builtins.mapAttrs addPackages prev.haskell.packages;
           };
         };
       };
