@@ -1,5 +1,5 @@
 module Genetic.Strategies
-  ( tournamentSelect
+  ( tournamentSelect,
   )
 where
 
@@ -14,6 +14,4 @@ tournamentSelect populationWithFitness = do
   pure $ if fitness0 > fitness1 then member0 else member1
 
 chooseVector :: MonadRandom m => Vector a -> m a
-chooseVector items = do
-  let numItems = Vector.length items
-  Vector.unsafeIndex items <$> getRandomR (0, numItems - 1)
+chooseVector items = Vector.unsafeIndex items <$> getRandomR (0, Vector.length items - 1)
