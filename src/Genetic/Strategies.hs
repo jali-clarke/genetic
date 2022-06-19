@@ -2,6 +2,7 @@ module Genetic.Strategies
   ( rouletteSelect,
     tournamentSelect,
     gaussianMutate,
+    noMutate,
     uniformMutate,
   )
 where
@@ -36,6 +37,9 @@ gaussianMutate stdDev base = do
   x <- getRandomR (0, 1)
   y <- getRandomR (0, 1)
   pure $ stdDev * sqrt (-2 * log x) * cos (2 * pi * y) + base
+
+noMutate :: Monad m => a -> m a
+noMutate = pure
 
 uniformMutate :: (Random a, Num a, MonadRandom m) => (a, a) -> a -> m a
 uniformMutate (deltaMin, deltaMax) base = (+ base) <$> getRandomR (deltaMin, deltaMax)
