@@ -46,7 +46,7 @@ noMutate :: Monad m => a -> m a
 noMutate = pure
 
 {-# SPECIALIZE uniformMutate :: (Double, Double) -> Double -> IO Double #-}
-uniformMutate :: (Random a, Num a, MonadRandom m) => (a, a) -> a -> m a
+uniformMutate :: (Num a, Random a, MonadRandom m) => (a, a) -> a -> m a
 uniformMutate (deltaMin, deltaMax) base = (+ base) <$> getRandomR (deltaMin, deltaMax)
 
 {-# INLINEABLE chooseVectorUniform #-}
