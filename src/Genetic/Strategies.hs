@@ -1,5 +1,6 @@
 module Genetic.Strategies
-  ( rouletteSelect,
+  ( onEveryNthGeneration,
+    rouletteSelect,
     tournamentSelect,
     gaussianMutate,
     noMutate,
@@ -7,10 +8,17 @@ module Genetic.Strategies
   )
 where
 
+import Control.Monad (when)
 import Control.Monad.Random.Class (MonadRandom (getRandomR))
 import Control.Monad.Random.Lazy (Random)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
+
+{-# SPECIALIZE onEveryNthGeneration :: Int -> (Int -> Vector (a, Double) -> IO ()) -> Int -> Vector (a, Double) -> IO () #-}
+onEveryNthGeneration :: Monad m => Int -> (Int -> Vector (a, Double) -> m ()) -> Int -> Vector (a, Double) -> m ()
+onEveryNthGeneration skipInterval callback gen population =
+  when (gen `mod` skipInterval == 0) $
+    callback gen population
 
 {-# SPECIALIZE rouletteSelect :: Vector (a, Double) -> IO a #-}
 rouletteSelect :: MonadRandom m => Vector (a, Double) -> m a
