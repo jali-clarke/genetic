@@ -1,6 +1,7 @@
 module Genetic.Strategies
   ( rouletteSelect,
     tournamentSelect,
+    gaussianMutate,
     uniformMutate,
   )
 where
@@ -29,6 +30,12 @@ tournamentSelect populationWithFitness = do
   (member0, fitness0) <- chooseVectorUniform populationWithFitness
   (member1, fitness1) <- chooseVectorUniform populationWithFitness
   pure $ if fitness0 > fitness1 then member0 else member1
+
+gaussianMutate :: (Floating a, Random a, MonadRandom m) => a -> a -> m a
+gaussianMutate stdDev base = do
+  x <- getRandomR (0, 1)
+  y <- getRandomR (0, 1)
+  pure $ stdDev * sqrt (-2 * log x) * cos (2 * pi * y) + base
 
 uniformMutate :: (Random a, Num a, MonadRandom m) => (a, a) -> a -> m a
 uniformMutate (deltaMin, deltaMax) base = (+ base) <$> getRandomR (deltaMin, deltaMax)
