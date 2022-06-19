@@ -25,7 +25,7 @@ data Config m a = Config
 simulateSteps :: Monad m => Config m a -> Vector a -> m ()
 simulateSteps config = simulateSteps' config 0
 
-{-# INLINABLE simulateSteps' #-}
+{-# INLINEABLE simulateSteps' #-}
 simulateSteps' :: Monad m => Config m a -> Int -> Vector a -> m ()
 simulateSteps' config generationNumber population = do
   populationWithFitness <- populationWithFitnessSortedDesc config population
@@ -34,7 +34,7 @@ simulateSteps' config generationNumber population = do
     then onFinalGeneration config generationNumber populationWithFitness
     else nextPopulation config populationWithFitness >>= simulateSteps' config (generationNumber + 1)
 
-{-# INLINABLE populationWithFitnessSortedDesc #-}
+{-# INLINEABLE populationWithFitnessSortedDesc #-}
 populationWithFitnessSortedDesc :: Monad m => Config m a -> Vector a -> m (Vector (a, Double))
 populationWithFitnessSortedDesc config population =
   let compareFitnessDesc (_, fitness0) (_, fitness1) = fitness1 `compare` fitness0
@@ -42,7 +42,7 @@ populationWithFitnessSortedDesc config population =
         populationWithFitness <- Vector.forM population $ \member -> (member,) <$> (fitness config member)
         pure $ Vector.modify (MVector.sortBy compareFitnessDesc) populationWithFitness
 
-{-# INLINABLE nextPopulation #-}
+{-# INLINEABLE nextPopulation #-}
 nextPopulation :: Monad m => Config m a -> Vector (a, Double) -> m (Vector a)
 nextPopulation config populationWithFitness =
   let populationSize = Vector.length populationWithFitness

@@ -49,7 +49,7 @@ noMutate = pure
 uniformMutate :: (Random a, Num a, MonadRandom m) => (a, a) -> a -> m a
 uniformMutate (deltaMin, deltaMax) base = (+ base) <$> getRandomR (deltaMin, deltaMax)
 
-{-# INLINABLE chooseVectorUniform #-}
+{-# INLINEABLE chooseVectorUniform #-}
 chooseVectorUniform :: MonadRandom m => Vector a -> m a
 chooseVectorUniform items = Vector.unsafeIndex items <$> getRandomR (0, Vector.length items - 1)
 

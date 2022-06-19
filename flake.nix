@@ -4,18 +4,18 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     {
-      overlays.default = final: prev:
-        let
-          overrides = haskellSelf: haskellSuper: {
-            genetic = haskellSelf.callCabal2nix "genetic" ./. { };
-          };
-        in
-        {
-          haskellPackages = prev.haskellPackages.override { inherit overrides; };
+      overlays = {
+        haskell = haskellSelf: haskellSuper: {
+          genetic = haskellSelf.callCabal2nix "genetic" ./. { };
+        };
+
+        default = final: prev: {
+          haskellPackages = prev.haskellPackages.override { overrides = self.overlays.haskell; };
           haskell = prev.haskell // {
-            packages = builtins.mapAttrs (_: compilerPackages: compilerPackages.override { inherit overrides; }) prev.haskell.packages;
+            packages = builtins.mapAttrs (_: compilerPackages: compilerPackages.override { overrides = self.overlays.haskell; }) prev.haskell.packages;
           };
         };
+      };
     } // flake-utils.lib.eachDefaultSystem (
       system:
       let
