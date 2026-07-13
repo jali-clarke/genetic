@@ -1,56 +1,80 @@
-{-# LANGUAGE TupleSections #-}
-
 module Genetic
-  ( Config (..),
-    simulateSteps,
+  ( Genetic (..),
+    GeneticOpts (..),
+    newPopulation,
+    rankGeneration,
+    nextGeneration,
+    simulate,
   )
 where
 
-import Data.Vector (Vector)
+import qualified Control.Monad.Random as Random
+import Control.Monad.ST (runST)
+import qualified Data.Foldable as Foldable
 import qualified Data.Vector as Vector
-import qualified Data.Vector.Algorithms.Merge as MVector
+import qualified Data.Vector.Algorithms.Heap as Heap
+import Genetic.Positive (Positive)
 
-data Config m a = Config
-  { fitness :: a -> m Double,
-    select :: Vector (a, Double) -> m a,
-    crossover :: a -> a -> m a,
-    mutate :: a -> m a,
+class Genetic a where
+  generateNew :: (Random.MonadRandom m) => m a
+  crossover :: (Random.MonadRandom m) => a -> a -> m a
+  mutate :: (Random.MonadRandom m) => a -> m a
+
+data GeneticOpts m a
+  = GeneticOpts
+  { populationSize :: Int,
+    fitness :: a -> m Positive,
     numElites :: Int,
-    numGenerations :: Int,
-    onGeneration :: Int -> Vector (a, Double) -> m (),
-    onFinalGeneration :: Int -> Vector (a, Double) -> m ()
+    replicateWeight :: Positive,
+    crossoverWeight :: Positive,
+    mutateWeight :: Positive
   }
 
-{-# SPECIALIZE simulateSteps :: Config IO a -> Vector a -> IO () #-}
-simulateSteps :: Monad m => Config m a -> Vector a -> m ()
-simulateSteps config = simulateSteps' config 0
+newPopulation :: (Genetic a, Random.MonadRandom m) => GeneticOpts m a -> m (Vector.Vector a)
+newPopulation opts = Vector.replicateM (populationSize opts) generateNew
 
-{-# INLINEABLE simulateSteps' #-}
-simulateSteps' :: Monad m => Config m a -> Int -> Vector a -> m ()
-simulateSteps' config generationNumber population = do
-  populationWithFitness <- populationWithFitnessSortedDesc config population
-  onGeneration config generationNumber populationWithFitness
-  if generationNumber == numGenerations config - 1
-    then onFinalGeneration config generationNumber populationWithFitness
-    else nextPopulation config populationWithFitness >>= simulateSteps' config (generationNumber + 1)
+rankGeneration :: (Monad m) => GeneticOpts m a -> Vector.Vector a -> m (Vector.Vector (a, Positive))
+rankGeneration opts currentGen = do
+  withFitnesses <- Vector.mapM (\a -> fitness opts a >>= (\f -> pure (a, f))) currentGen
+  let withFitnessesSorted = runST $ do
+        withFitnessesMutable <- Vector.thaw withFitnesses
+        Heap.sortBy (\(_, f0) (_, f1) -> compare f1 f0) withFitnessesMutable
+        Vector.unsafeFreeze withFitnessesMutable
+  pure withFitnessesSorted
 
-{-# INLINEABLE populationWithFitnessSortedDesc #-}
-populationWithFitnessSortedDesc :: Monad m => Config m a -> Vector a -> m (Vector (a, Double))
-populationWithFitnessSortedDesc config population =
-  let compareFitnessDesc (_, fitness0) (_, fitness1) = fitness1 `compare` fitness0
-   in do
-        populationWithFitness <- Vector.forM population $ \member -> (member,) <$> (fitness config member)
-        pure $ Vector.modify (MVector.sortBy compareFitnessDesc) populationWithFitness
+nextGeneration :: (Genetic a, Random.MonadRandom m) => GeneticOpts m a -> Vector.Vector (a, Positive) -> m (Vector.Vector a)
+nextGeneration opts withFitnessesSorted =
+  Vector.generateM
+    (populationSize opts)
+    ( \idx ->
+        if idx < numElites opts
+          then pure $ fst (withFitnessesSorted Vector.! idx)
+          else produceIndividual opts withFitnessesSorted
+    )
 
-{-# INLINEABLE nextPopulation #-}
-nextPopulation :: Monad m => Config m a -> Vector (a, Double) -> m (Vector a)
-nextPopulation config populationWithFitness =
-  let populationSize = Vector.length populationWithFitness
-      elites = Vector.map fst $ Vector.take (numElites config) populationWithFitness
-   in do
-        children <-
-          Vector.replicateM (populationSize - numElites config) $ do
-            parent0 <- select config populationWithFitness
-            parent1 <- select config populationWithFitness
-            crossover config parent0 parent1 >>= mutate config
-        pure $ elites <> children
+simulate :: (Genetic a, Random.MonadRandom m) => GeneticOpts m a -> Int -> Vector.Vector a -> (Int -> Vector.Vector (a, Positive) -> m ()) -> m (Vector.Vector (a, Positive))
+simulate = simulate' 0
+
+simulate' :: (Genetic a, Random.MonadRandom m) => Int -> GeneticOpts m a -> Int -> Vector.Vector a -> (Int -> Vector.Vector (a, Positive) -> m ()) -> m (Vector.Vector (a, Positive))
+simulate' iterIdx opts numIters thisGen callback = do
+  withFitnessesSorted <- rankGeneration opts thisGen
+  callback iterIdx withFitnessesSorted
+  if iterIdx < numIters
+    then do
+      nextGen <- nextGeneration opts withFitnessesSorted
+      simulate' (iterIdx + 1) opts numIters nextGen callback
+    else pure withFitnessesSorted
+
+produceIndividual :: (Genetic a, Random.MonadRandom m) => GeneticOpts m a -> Vector.Vector (a, Positive) -> m a
+produceIndividual opts as = do
+  a <- weighted as
+  modifier <-
+    weighted
+      [ (pure, replicateWeight opts),
+        (\a' -> weighted as >>= crossover a', crossoverWeight opts),
+        (mutate, mutateWeight opts)
+      ]
+  modifier a
+
+weighted :: (Foldable t, Random.MonadRandom m) => t (a, Positive) -> m a
+weighted = Random.fromList . fmap (\(w, p) -> (w, toRational p)) . Foldable.toList

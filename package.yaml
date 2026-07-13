@@ -1,18 +1,11 @@
-# https://github.com/sol/hpack
-
+spec-version: 0.36.0
 name: genetic
 version: 0.0.0.1
-build-type: Simple
-
+ghc-options: -Wall -Werror
+dependencies:
+  - base >= 4.13 && < 5
+  - MonadRandom
+  - vector
+  - vector-algorithms
 library:
-  source-dirs:
-  - src
-  dependencies:
-  - base >=4.15.1.0
-  - MonadRandom >=0.5.3
-  - vector >=0.12.3.1
-  - vector-algorithms >=0.8.0.4 
-  ghc-options:
-  - -O2
-  - -Wall
-  - -Werror
+  source-dirs: src

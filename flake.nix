@@ -1,49 +1,62 @@
 {
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/release-26.05";
 
-  outputs = { self, nixpkgs, flake-utils }:
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs =
+    inputs@{ self, ... }:
+    let
+      systems = [
+        "x86_64-linux"
+        "aarch64-darwin"
+      ];
+
+      eachSystem =
+        f: inputs.nixpkgs.lib.genAttrs systems (system: f inputs.nixpkgs.legacyPackages.${system});
+    in
     {
-      overlays = {
-        haskell = haskellSelf: haskellSuper: {
-          genetic = haskellSelf.callCabal2nix "genetic" ./. { };
-        };
+      formatter = eachSystem (
+        pkgs:
+        (inputs.treefmt-nix.lib.evalModule pkgs {
+          programs.nixfmt.enable = true;
+          programs.ormolu.enable = true;
+          programs.yamlfmt.enable = true;
+        }).config.build.wrapper
+      );
 
-        default = final: prev: {
-          haskellPackages = prev.haskellPackages.override { overrides = self.overlays.haskell; };
-          haskell = prev.haskell // {
-            packages =
-              let
-                addPackages = _: compilerPackages: compilerPackages.override {
-                  overrides = self.overlays.haskell;
-                };
-              in
-              builtins.mapAttrs addPackages prev.haskell.packages;
-          };
-        };
+      overlays.haskell = hfinal: hprev: {
+        genetic = hfinal.callCabal2nix "genetic" ./. { };
       };
-    } // flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs { inherit system; overlays = [ self.overlays.default ]; };
 
-        cabalWrapped = pkgs.writeShellScriptBin "cabal" ''
-          ${pkgs.hpack}/bin/hpack && exec ${pkgs.cabal-install}/bin/cabal "$@"
-        '';
+      devShells = eachSystem (pkgs: {
+        default = pkgs.mkShell {
+          name = "genetic-dev";
 
-        format-all = pkgs.writeShellScriptBin "format-all" ''
-          shopt -s globstar
-          ${pkgs.nixpkgs-fmt}/bin/nixpkgs-fmt . && ${pkgs.ormolu}/bin/ormolu -i src/**/*.hs
-        '';
-      in
-      {
-        devShells.default = pkgs.mkShell {
-          inputsFrom = [ pkgs.haskellPackages.genetic.env ];
-          packages = [
-            cabalWrapped
-            format-all
-          ];
+          packages =
+            let
+              ghc = pkgs.haskell.packages.ghc984.ghcWithPackages (p: [
+                p.hspec-expectations
+                p.MonadRandom
+                p.vector
+                p.vector-algorithms
+              ]);
+
+              cabal-install = pkgs.writeShellScriptBin "cabal" ''
+                ${pkgs.hpack}/bin/hpack --silent
+                exec ${pkgs.cabal-install}/bin/cabal --active-repositories=:none "$@"
+              '';
+            in
+            [
+              cabal-install
+              ghc
+              pkgs.hpack
+            ];
         };
-      }
-    );
+      });
+    };
 }
