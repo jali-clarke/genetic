@@ -1,5 +1,9 @@
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 module Genetic
   ( Genetic (..),
+    Mutatable (..),
     GeneticOpts (..),
     newPopulation,
     rankGeneration,
@@ -14,11 +18,25 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Algorithms.Heap as Heap
 import Genetic.Positive (Positive)
+import Genetic.Zipperable (Zipperable (..))
 
-class Genetic a where
+class (Mutatable a) => Genetic a where
   generateNew :: (Random.MonadRandom m) => m a
+
   crossover :: (Random.MonadRandom m) => a -> a -> m a
+  default crossover :: (Zipperable a, Random.MonadRandom m) => a -> a -> m a
+  crossover a b = do
+    (ctxA, holeA) <- split a
+    (ctxB, holeB) <- split b
+    Random.uniform [ctxA holeB, ctxB holeA]
+
+class Mutatable a where
   mutate :: (Random.MonadRandom m) => a -> m a
+  default mutate :: (Zipperable a, Mutatable (Hole a), Random.MonadRandom m) => a -> m a
+  mutate a = do
+    (ctx, hole) <- split a
+    hole' <- mutate hole
+    pure $ ctx hole'
 
 data GeneticOpts m a
   = GeneticOpts
