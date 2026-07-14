@@ -70,18 +70,18 @@ nextGeneration opts withFitnessesSorted =
           else produceIndividual opts withFitnessesSorted
     )
 
-simulate :: (Genetic a, Random.MonadRandom m) => GeneticOpts m a -> Int -> Vector.Vector a -> (Int -> Vector.Vector (a, Positive) -> m ()) -> m (Vector.Vector (a, Positive))
+simulate :: (Genetic a, Random.MonadRandom m) => GeneticOpts m a -> Vector.Vector a -> (Int -> Vector.Vector (a, Positive) -> m Bool) -> m ()
 simulate = simulate' 0
 
-simulate' :: (Genetic a, Random.MonadRandom m) => Int -> GeneticOpts m a -> Int -> Vector.Vector a -> (Int -> Vector.Vector (a, Positive) -> m ()) -> m (Vector.Vector (a, Positive))
-simulate' iterIdx opts numIters thisGen callback = do
+simulate' :: (Genetic a, Random.MonadRandom m) => Int -> GeneticOpts m a -> Vector.Vector a -> (Int -> Vector.Vector (a, Positive) -> m Bool) -> m ()
+simulate' iterIdx opts thisGen callback = do
   withFitnessesSorted <- rankGeneration opts thisGen
-  callback iterIdx withFitnessesSorted
-  if iterIdx < numIters
+  shouldContinue <- callback iterIdx withFitnessesSorted
+  if shouldContinue
     then do
       nextGen <- nextGeneration opts withFitnessesSorted
-      simulate' (iterIdx + 1) opts numIters nextGen callback
-    else pure withFitnessesSorted
+      simulate' (iterIdx + 1) opts nextGen callback
+    else pure ()
 
 produceIndividual :: (Genetic a, Random.MonadRandom m) => GeneticOpts m a -> Vector.Vector (a, Positive) -> m a
 produceIndividual opts as = do
